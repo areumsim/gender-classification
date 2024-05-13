@@ -1,0 +1,15 @@
+data :
+  PETA:
+    data_dir: "C:/Users/wolve/arsim/spacevision_classification/dataset/PETA/PETAdataset"
+    height : 224
+    width : 224
+    # 256x256 / 224x224
+
+model_save_path : "C:/Users/wolve/arsim/spacevision_classification/model_save/"
+
+# train_params:
+#   batch_size : 48
+#   learning_rate : 1.e-5
+#   weight_decay : 5.e-5
+#   betas : [0.9, 0.99]
+#   num_epoch : 100
