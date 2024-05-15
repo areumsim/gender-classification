@@ -4,15 +4,15 @@ data :
     height : 224
     width : 224
 
-model_save_path: "E:/sim/gender-classification/model_save/"
+# model_save_path: "E:/sim/gender-classification/model_save/"
 
 mlflow:
   tracking_uri: "http://localhost:5000" # MLflow tracking server URI
   experiment_name: "sim_mlflow_setting_example"
-  log_every_n_step: 200 # PyTorch autologging
+  log_every_n_step: 500 # PyTorch autologging
 
 train:
-  num_epochs: 3
+  num_epochs: 2
   log_every_n_steps: 16
   limit_val_batches: 50
   check_val_every_n_epoch: 1
@@ -40,10 +40,10 @@ ray:
 
 hyperparameters:
   model_name: 
-    # - convnext_nano
-    # - resnet50
-    # - vgg16
-    # - vit_small_patch8_224_dino
+    - convnext_nano
+    - resnet50
+    - vgg16
+    - vit_small_patch8_224_dino
     - deit_small_patch16_224
   lr: 
     min : 0.0001 # 1e-4
@@ -53,4 +53,4 @@ hyperparameters:
     # - 16
   optimizer: 
     - adam
-  augment_data: True # True or False. The default is False(no_augment). If True then augmentation and no_augmentation grid_search.
+  augment_data: False # True or False. The default is False(no_augment). If True then augmentation and no_augmentation grid_search.

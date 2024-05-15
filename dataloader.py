@@ -1,9 +1,3 @@
-import logging
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 import os
 import random
 from glob import glob
@@ -15,9 +9,23 @@ import numpy as np
 import yaml
 import imgaug.augmenters as iaa
 import matplotlib.pyplot as plt
-import util
+
+import torch
+from einops import rearrange
 
 ### ref. https://github.com/Robocup-Lyontech/liris_person_attributes/blob/master/loader_peta_dataset.py
+
+
+def show_originalimage(image):
+    image = torch.clamp(image, -1, 1)
+    img = image.cpu().numpy().copy()
+    img *= np.array([0.229, 0.224, 0.225])[:, None, None]
+    img += np.array([0.485, 0.456, 0.406])[:, None, None]
+
+    img = rearrange(img, "c h w -> h w c")
+    img = img * 255
+    img = img.astype(np.uint8)
+    return img
 
 
 def make_transforms(height, width):
@@ -115,7 +123,7 @@ class PETADataset(Dataset):
             self.image_files, self.labels, self.is_train, split_ratio, seed
         )
 
-        self.augmentation = augmentation
+        self.augmentation = augmentation if augmentation is not None else False
         if self.augmentation:
             self.augmentation_seq = make_augmentation(
                 cfg["PETA"]["height"], cfg["PETA"]["width"]
@@ -169,7 +177,7 @@ class PETADataset(Dataset):
         random.shuffle(indices)
 
         split_idx = int(len(indices) * split_ratio)
-        train_indices = indices[:split_idx][:200]  #### test
+        train_indices = indices[:split_idx][:1500]  #### test
         valid_indices = indices[split_idx:][:100]  #### test
 
         ### (train/valid/test로) split ratio를 (0.7, 0.2)와 같이 입력 ###
@@ -212,23 +220,14 @@ class PETADataset(Dataset):
         label = self.labels[idx]
         image = Image.open(img_name).convert("RGB")  # Convert image to RGB
 
-        try:
-            if self.is_train and self.augmentation:
-                original_image = image
-                image = self.augmentation_seq(image=np.array(original_image))
-                image = Image.fromarray(image)
-        except Exception as e:
-            logging.warning(f"Augmentation error for image {img_name}: {e}")
-            image = original_image
-
-        # if self.is_train and self.augmentation:
-        #     original_image = image
-        #     image = self.augmentation_seq(image=np.array(original_image))
-        #     image = Image.fromarray(image)
+        if self.is_train and self.augmentation:
+            original_image = image
+            image = self.augmentation_seq(image=np.array(original_image))
+            image = Image.fromarray(image)
 
         # # Show concat image  the original image and the augment image
-        # original_img = util.show_originalimage(self.transform(original_image))
-        # augment_img = util.show_originalimage(self.transform(image))
+        # original_img = show_originalimage(self.transform(original_image))
+        # augment_img = show_originalimage(self.transform(image))
         # plt.figure(figsize=(10, 5))
         # plt.subplot(1, 2, 1)
         # plt.imshow(original_img)
@@ -256,7 +255,7 @@ if __name__ == "__main__":
     print(f"Label: {label}, Image shape: {image.shape}")
 
     # Show the original image
-    original_img = util.show_originalimage(image)
+    original_img = show_originalimage(image)
     label = ["male" if label == 1 else "female"]
     plt.imshow(original_img)
     plt.title(f"{label[0]}")

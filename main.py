@@ -1,198 +1,183 @@
-import os
+# ref. https://docs.ray.io/en/latest/train/getting-started-pytorch-lightning.html
+# MLFlow : https://docs.ray.io/en/latest/tune/examples/includes/mlflow_ptl_example.html
+#           https://docs.ray.io/en/latest/tune/examples/tune-mlflow.html
 
+import os
+import yaml
+
+from ray import tune
+from ray.train import RunConfig
+from ray.tune.schedulers import ASHAScheduler
+from ray.tune.integration.pytorch_lightning import TuneReportCheckpointCallback
+
+from torch.utils.data import DataLoader
+from dataloader import PETADataset
+from ImageClassifier import ImageClassifier
+
+import mlflow
+import lightning.pytorch as pl
+
+# Configure environment for CUDA
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 
-import lightning.pytorch as pl
-
-# import lightning as L
-import mlflow.pytorch
-
-# Required libraries
-import ray
-import ray.air as air
-import ray.train.lightning
-import torch
-import torch.nn as nn
-import torch.optim as optim
-
-#  https://docs.ray.io/en/latest/tune/examples/tune-mlflow.html
-import yaml
-from ray import tune
-
-# from ray.tune.integration.mlflow import MLflowLoggerCallback
-from ray.air.integrations.mlflow import MLflowLoggerCallback, setup_mlflow
-from ray.train import ScalingConfig
-from ray.train.torch import TorchConfig, TorchTrainer
-from ray import train, tune
-from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler
-from torch.utils.data import DataLoader
-from torchvision import datasets, models, transforms
-from torchvision.datasets import FashionMNIST
-from torchvision.models import resnet18
-from torchvision.transforms import Compose, Normalize, ToTensor
-
-from dataloader import PETADataset
-from torch.optim import SGD, Adam
-from torchmetrics import Accuracy
+def setup_mlflow(config):
+    """
+    Configure MLflow for experiment tracking and autologging.
+    """
+    mlflow.set_tracking_uri(config["cfg"]["mlflow"]["tracking_uri"])
+    mlflow.set_experiment(config["cfg"]["mlflow"]["experiment_name"])
+    mlflow.log_params(config)
+    mlflow.pytorch.autolog(log_every_n_step=config["cfg"]["mlflow"]["log_every_n_step"])
 
 
-import timm
-
-
-class ImageClassifier(pl.LightningModule):
-    def __init__(self, config):
-        super(ImageClassifier, self).__init__()
-        self.lf = config["lr"]
-
-        self.criterion = torch.nn.BCEWithLogitsLoss()
-
-        self.optimizer = Adam
-
-        self.acc = Accuracy(task="binary", num_classes=1)
-
-        # Using a pretrained backbone
-        self.model = timm.create_model(
-            config["model_name"], pretrained=True, num_classes=1
-        )
-
-    def forward(self, x):
-        x = self.model(x)
-        return x.squeeze(-1)
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        outputs = self.forward(x)
-        loss = self.criterion(outputs, y.float())
-        self.log("loss", loss, on_step=True, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        self.val_origin_image = x
-        self.val_output = self.forward(x)
-        loss = self.criterion(self.val_output, y.float())
-        self.log("val_loss", loss, on_step=True, prog_bar=True)
-        return loss
-
-    def configure_optimizers(self):
-        return self.optimizer(self.model.parameters(), lr=self.lf)
-
-
-def train_func(config):
-    ###### dataload  ######
-    train_dataset = PETADataset(True, cfg["data"])
-    valid_dataset = PETADataset(False, cfg["data"])
+def create_dataloaders(config):
+    """
+    Create and return DataLoaders for training and validation datasets.
+    """
+    train_dataset = PETADataset(
+        True, config["cfg"]["data"], augmentation=config["augment_data"]
+    )
+    valid_dataset = PETADataset(False, config["cfg"]["data"])
 
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["batch_size"],
         shuffle=True,
         pin_memory=True,
-        num_workers=4,
+        num_workers=config["cfg"]["train"]["num_workers"],
         persistent_workers=True,
     )
     valid_loader = DataLoader(
         valid_dataset,
         batch_size=config["batch_size"],
-        shuffle=True,
+        shuffle=False,
         pin_memory=True,
-        num_workers=2,
+        num_workers=config["cfg"]["valid"]["num_workers"],
         persistent_workers=True,
     )
 
-    # Training
+    return train_loader, valid_loader
+
+
+def train_model(config):
+    """
+    Function to initialize data loaders, model, and trainer to be used with Ray.
+    """
+    config_ = config["cfg"]
+    train_loader, valid_loader = create_dataloaders(config)
+    setup_mlflow(config)  # test . config / config_
+
+    callbacks = [
+        TuneReportCheckpointCallback(
+            metrics={
+                "loss": "loss",
+                "val_loss": "val_loss",
+                "acc": "acc",
+                "val_acc": "val_acc",
+            },
+            on="validation_end",
+        )
+    ]
+
+    # Initialize the model
     model = ImageClassifier(config)
 
     # Configure PyTorch Lightning Trainer.
     trainer = pl.Trainer(
+        max_epochs=config_["train"]["num_epochs"],
         devices="auto",
         accelerator="auto",
-        strategy=ray.train.lightning.RayDDPStrategy(),
-        plugins=[ray.train.lightning.RayLightningEnvironment()],
-        callbacks=[ray.train.lightning.RayTrainReportCallback()],
-        enable_checkpointing=False,
-        log_every_n_steps=16,
-        limit_val_batches=50,
-        val_check_interval=1 / 10,
+        log_every_n_steps=config_["train"]["log_every_n_steps"],
+        limit_val_batches=config_["train"]["limit_val_batches"],
+        # val_check_interval=0.1,
+        check_val_every_n_epoch=config_["train"]["check_val_every_n_epoch"],
+        callbacks=callbacks,
     )
 
-    trainer = ray.train.lightning.prepare_trainer(trainer)
     trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=valid_loader)
 
 
-if __name__ == "__main__":
-    ### config
-    with open("config.yaml", "r") as stream:
-        cfg = yaml.safe_load(stream)
+def load_yaml_config(config_path="config.yaml"):
+    """
+    Load the configuration file.
+    """
+    with open(config_path, "r") as stream:
+        return yaml.safe_load(stream)
 
-    model_candidates = [
-        "resnet50",
-        "vgg16",
-        "convnext_base",
-        "vit_small_patch8_224_dino",
-        "deit_small_patch16_224",
-    ]
-    optimizers = {"adam": Adam, "sgd": SGD}
 
-    config = {
-        "cfg": cfg,
-    }
-    search_space = {
-        "model_name": tune.grid_search(model_candidates),
-        "lr": tune.loguniform(1e-4, 1e-2),
-        "batch_size": tune.grid_search([8, 16, 32]),  # tune.choice([8, 16]),
-    }
+def custom_trial_dirname_creator(trial):
+    return f"trial_{trial.trial_id}"
 
-    scheduler = ASHAScheduler(max_t=20, grace_period=1, reduction_factor=2)
 
-    storage_path = (
-        "C:\\Users\\wolve\\arsim\\spacevision_classification\\ray_tmp\\ray_results"
-    )
-    os.makedirs(storage_path, exist_ok=True)
-    exp_name = "tune_analyzing_results"
+def main():
+    config = load_yaml_config()
+    cfg_tune = config["ray"]["tune"]
+    cfg_scheduler = config["ray"]["scheduler"]
+    cfg_hyperparameters = config["hyperparameters"]
 
-    # Configure scaling and resource requirements.
-    scaling_config = ScalingConfig(
-        num_workers=1,
-        use_gpu=True,
-        trainer_resources={"GPU": 0.0},
+    # Runtime configuration for individual trials
+    ray_storage_path = config["ray"]["storage_path"]
+    os.makedirs(ray_storage_path, exist_ok=True)
+
+    run_config = RunConfig(
+        name=config["ray"]["run_name"],
+        # failure_config=FailureConfig(config["ray"]["max_failures"]),
+        storage_path=ray_storage_path,
     )
 
-    max_failures = 2
-    run_config = ray.train.RunConfig(
-        failure_config=ray.train.FailureConfig(max_failures),
-        checkpoint_config=ray.train.CheckpointConfig(
-            checkpoint_score_attribute="val_loss",
-            num_to_keep=5,
+    tune_config = tune.TuneConfig(
+        metric=cfg_tune["metric"],
+        mode=cfg_tune["mode"],
+        num_samples=cfg_tune["num_samples"],
+        scheduler=ASHAScheduler(
+            max_t=cfg_scheduler["max_t"],
+            grace_period=cfg_scheduler["grace_period"],
+            reduction_factor=cfg_scheduler["reduction_factor"],
         ),
-        storage_path=storage_path,
+        max_concurrent_trials=cfg_tune["max_concurrent_trials"],
+        trial_dirname_creator=custom_trial_dirname_creator,
     )
-    torch_config = TorchConfig(backend="gloo")
 
-    trainer = TorchTrainer(
-        train_func,
-        train_loop_config=config,
-        scaling_config=scaling_config,
-        torch_config=torch_config,
-        run_config=run_config,
-    )
+    config_total = {
+        "cfg": config,
+        ##### hyperparameters #####
+        "model_name": tune.grid_search(cfg_hyperparameters["model_name"]),
+        "lr": tune.loguniform(
+            cfg_hyperparameters["lr"]["min"],
+            cfg_hyperparameters["lr"]["max"],
+        ),
+        "batch_size": tune.grid_search(cfg_hyperparameters["batch_size"]),
+        "optimizer": tune.choice(cfg_hyperparameters["optimizer"]),
+        "augment_data": (
+            tune.grid_search([True, False])
+            if cfg_hyperparameters["augment_data"]
+            else False
+        ),
+    }
+
+    trainable = tune.with_parameters(train_model)
 
     tuner = tune.Tuner(
-        trainer,
-        param_space={"train_loop_config": search_space},
-        tune_config=tune.TuneConfig(
-            metric="loss",
-            mode="min",
-            scheduler=scheduler,
+        tune.with_resources(
+            trainable,
+            resources={
+                "cpu": config["ray"]["resources"]["cpus_per_trial"],
+                "gpu": config["ray"]["resources"]["gpus_per_trial"],
+            },
         ),
+        tune_config=tune_config,
+        run_config=run_config,
+        param_space=config_total,
     )
 
-    result = tuner.fit()
-    result
+    results = tuner.fit()
+    best_result = results.get_best_result("val_loss", "min")
+    print("Best trial config:", best_result.config)
+    print("Best trial final validation loss:", best_result.metrics["val_loss"])
 
-    best_result = result.get_best_result("val_loss", "min")
-    print("Best trial config: {}".format(best_result.config))
+
+if __name__ == "__main__":
+    main()
