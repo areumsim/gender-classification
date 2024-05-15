@@ -1,20 +1,20 @@
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 import os
 import random
 from glob import glob
 import pathlib
-
-import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
 import yaml
-
-import imgaug as ia
 import imgaug.augmenters as iaa
-from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
-
+import matplotlib.pyplot as plt
 import util
 
 ### ref. https://github.com/Robocup-Lyontech/liris_person_attributes/blob/master/loader_peta_dataset.py
@@ -42,6 +42,9 @@ def make_transforms(height, width):
 
 
 def make_augmentation(height=224, width=224):
+    """
+    Create an imgaug augmentation pipeline.
+    """
     return iaa.Sequential(
         [
             iaa.Sometimes(
@@ -76,7 +79,9 @@ def make_augmentation(height=224, width=224):
                         iaa.Resize(
                             {"height": 0.8, "width": 0.8}
                         ),  # Resize the image to 80% of its original dimensions
-                        iaa.PadToFixedSize(width=224, height=224, position="uniform"),
+                        iaa.PadToFixedSize(
+                            width=width, height=height, position="uniform"
+                        ),
                         iaa.MultiplyHue((0.5, 1.5)),
                         iaa.ChangeColorTemperature((1100, 10000)),
                         iaa.Sharpen(alpha=(0, 1.0), lightness=(0.75, 1.5)),
@@ -164,8 +169,8 @@ class PETADataset(Dataset):
         random.shuffle(indices)
 
         split_idx = int(len(indices) * split_ratio)
-        train_indices = indices[:split_idx][:200]  #### sim-test
-        valid_indices = indices[split_idx:][:100]  #### sim-test
+        train_indices = indices[:split_idx][:200]  #### test
+        valid_indices = indices[split_idx:][:100]  #### test
 
         ### (train/valid/test로) split ratio를 (0.7, 0.2)와 같이 입력 ###
         # train_end = int(len(indices) * split_ratios[0])
@@ -207,23 +212,32 @@ class PETADataset(Dataset):
         label = self.labels[idx]
         image = Image.open(img_name).convert("RGB")  # Convert image to RGB
 
-        if self.is_train and self.augmentation:
-            original_image = image
-            image = self.augmentation_seq(image=np.array(original_image))
-            image = Image.fromarray(image)
+        try:
+            if self.is_train and self.augmentation:
+                original_image = image
+                image = self.augmentation_seq(image=np.array(original_image))
+                image = Image.fromarray(image)
+        except Exception as e:
+            logging.warning(f"Augmentation error for image {img_name}: {e}")
+            image = original_image
 
-            # # Show concat image  the original image and the augment image
-            # original_img = util.show_originalimage(self.transform(original_image))
-            # augment_img = util.show_originalimage(self.transform(image))
-            # plt.figure(figsize=(10, 5))
-            # plt.subplot(1, 2, 1)
-            # plt.imshow(original_img)
-            # plt.title(f"Original Image")
-            # plt.axis("off")
-            # plt.subplot(1, 2, 2)
-            # plt.imshow(augment_img)
-            # plt.title(f"Augment Image")
-            # plt.axis("off")
+        # if self.is_train and self.augmentation:
+        #     original_image = image
+        #     image = self.augmentation_seq(image=np.array(original_image))
+        #     image = Image.fromarray(image)
+
+        # # Show concat image  the original image and the augment image
+        # original_img = util.show_originalimage(self.transform(original_image))
+        # augment_img = util.show_originalimage(self.transform(image))
+        # plt.figure(figsize=(10, 5))
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(original_img)
+        # plt.title(f"Original Image")
+        # plt.axis("off")
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(augment_img)
+        # plt.title(f"Augment Image")
+        # plt.axis("off")
 
         image = self.transform(image)
 
@@ -235,7 +249,7 @@ if __name__ == "__main__":
         cfg = yaml.safe_load(stream)
 
     train_dataset = PETADataset(True, cfg["data"], augmentation=True)
-    valid_dataset = PETADataset(False, cfg["data"], augmentation=False)
+    valid_dataset = PETADataset(False, cfg["data"])
 
     # Example to fetch an image and its label from the validation set
     image, label = train_dataset[0]
