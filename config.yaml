@@ -8,11 +8,11 @@ data :
 
 mlflow:
   tracking_uri: "http://localhost:5000" # MLflow tracking server URI
-  experiment_name: "sim_mlflow_setting_example"
-  log_every_n_step: 500 # PyTorch autologging
+  experiment_name: "PETAdataset_classification_hypertun"
+  log_every_n_step: 100 # PyTorch autologging
 
 train:
-  num_epochs: 2
+  num_epochs: 10
   log_every_n_steps: 16
   limit_val_batches: 50
   check_val_every_n_epoch: 1
@@ -22,7 +22,7 @@ valid:
   num_workers: 2
 
 ray:
-  storage_path: "E:/sim/gender-classification/ray_tmp/ray_results"
+  storage_path: "E:/sim/gender-classification/ray_results"
   max_failures : 2  # Occurs InvalidStateError (not-used)
   run_name: "tune_p"
   scheduler: # Early stopping scheduler
@@ -32,7 +32,7 @@ ray:
   tune:
     metric: "val_loss"
     mode: "min"
-    num_samples: 1  # Number of times to sample from the hyperparameter space
+    num_samples: 3  # Number of times to sample from the hyperparameter space
     max_concurrent_trials: 1 # Maximum number of trials to run concurrently
   resources:
     cpus_per_trial: 4.0
@@ -40,9 +40,9 @@ ray:
 
 hyperparameters:
   model_name: 
-    - convnext_nano
-    - resnet50
-    - vgg16
+    # - convnext_nano
+    # - resnet50
+    # - vgg16
     - vit_small_patch8_224_dino
     - deit_small_patch16_224
   lr: 
@@ -50,7 +50,7 @@ hyperparameters:
     max : 0.01 # 1e-2 
   batch_size :
     - 8
-    # - 16
+    - 16
   optimizer: 
     - adam
-  augment_data: False # True or False. The default is False(no_augment). If True then augmentation and no_augmentation grid_search.
+  augment_data: True # True or False. The default is False(no_augment). If True then augmentation and no_augmentation grid_search.

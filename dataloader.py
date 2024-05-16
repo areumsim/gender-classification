@@ -177,10 +177,10 @@ class PETADataset(Dataset):
         random.shuffle(indices)
 
         split_idx = int(len(indices) * split_ratio)
-        train_indices = indices[:split_idx][:1500]  #### test
-        valid_indices = indices[split_idx:][:100]  #### test
+        train_indices = indices[:split_idx]  #### test  [:1500]
+        valid_indices = indices[split_idx:]  #### test  [:100]
 
-        ### (train/valid/test로) split ratio를 (0.7, 0.2)와 같이 입력 ###
+        ### (train/valid/test로 ) split ratio를 (0.7, 0.2)와 같이 입력 ###
         # train_end = int(len(indices) * split_ratios[0])
         # valid_end = train_end + int(len(indices) * split_ratios[1])
 
