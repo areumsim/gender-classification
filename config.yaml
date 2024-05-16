@@ -39,7 +39,7 @@ ray:
 hyperparameters:
   model_name: 
     # - convnext_nano
-    - resnet50
+    # - resnet50
     - vgg16
     - vit_small_patch8_224_dino
     # - deit_small_patch16_224
@@ -47,8 +47,8 @@ hyperparameters:
     min : 0.0001 # 1e-4
     max : 0.01 # 1e-2 
   batch_size :
-    # - 8
-    - 16
+    - 8
+    # - 16
   optimizer: 
     - adam
   augment_data: True # [ True or False ] . The default is False(no_augment). If True then augmentation and no_augmentation grid_search.

@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 
 import torch
 from einops import rearrange
+from tqdm import tqdm
+import fnmatch
 
 
 def show_original_image(image):
@@ -116,7 +118,16 @@ class PETADataset(Dataset):
         self.data_dir = cfg["PETA"]["data_dir"]
         self.transform = create_transforms(cfg["PETA"]["height"], cfg["PETA"]["width"])
 
-        self.image_files, self.labels = self.load_dataset()
+        if not os.path.exists("./dataset_tmp/paths.txt") and not os.path.exists(
+            "labels.txt"
+        ):
+            self.image_files, self.labels = self.load_dataset()
+        else:
+            with open("./dataset_tmp/paths.txt", "r") as file:
+                self.image_files = file.read().splitlines()
+            with open("./dataset_tmp/labels.txt", "r") as file:
+                self.labels = file.read().splitlines()
+            self.labels = [int(label) for label in self.labels]
 
         # Shuffle and split the dataset
         self.image_files, self.labels = self.shuffle_and_split(
@@ -139,7 +150,6 @@ class PETADataset(Dataset):
         """
         image_files = []
         labels = []
-
         for s_dataset in glob(os.path.join(self.data_dir, "*")):
             label_path = pathlib.Path(os.path.join(s_dataset, "archive", "Label.txt"))
             s_labels = label_path.read_text().splitlines()
@@ -147,14 +157,37 @@ class PETADataset(Dataset):
             # Extract filenames for male and female images
             m_files = [x.split()[0] for x in s_labels if "personalMale" in x]
             fm_files = [x.split()[0] for x in s_labels if "personalFemale" in x]
+            m_files = list(set(m_files))
+            fm_files = list(set(fm_files))
 
             # Build file paths and labels
-            for img_set, label in [(m_files, 1), (fm_files, 0)]:
-                for file in img_set:
-                    image_path = os.path.join(s_dataset, "archive", file)
-                    if os.path.exists(image_path):
-                        image_files.append(image_path)
-                        labels.append(label)
+            all_fm_paths = []
+            for x in tqdm(fm_files):
+                all_fm_paths.extend(glob(os.path.join(s_dataset, "archive", x) + "_*"))
+                all_fm_paths.extend(glob(os.path.join(s_dataset, "archive", x)))
+            for image_path in all_fm_paths:
+                image_files.append(image_path)
+                labels.append(0)
+
+            all_m_paths = []
+            for x in tqdm(m_files):
+                all_m_paths.extend(glob(os.path.join(s_dataset, "archive", x) + "_*"))
+                all_m_paths.extend(glob(os.path.join(s_dataset, "archive", x)))
+            for image_path in all_m_paths:
+                image_files.append(image_path)
+                labels.append(1)
+
+        # Write the file paths to the file
+        file_path = "./dataset_tmp/paths.txt"
+        with open(file_path, "w") as file:
+            for path in image_files:
+                file.write(path + "\n")
+
+        # Write the labels to the file
+        file_path = "./dataset_tmp/labels.txt"
+        with open(file_path, "w") as file:
+            for path in labels:
+                file.write(str(path) + "\n")
 
         return image_files, labels
 
@@ -193,6 +226,12 @@ class PETADataset(Dataset):
         #     return [image_files[i] for i in test_indices], [
         #         labels[i] for i in test_indices
         #     ]
+
+        #  count each label (0 or 1 ) in train and valid
+        print(f"train_indices: {len(train_indices)}")
+        print(f"valid_indices: {len(valid_indices)}")
+        print(f"train_labels: {sum([labels[i] for i in train_indices])}")
+        print(f"valid_labels: {sum([labels[i] for i in valid_indices])}")
 
         if train:
             return [image_files[i] for i in train_indices], [
