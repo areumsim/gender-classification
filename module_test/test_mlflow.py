@@ -78,7 +78,6 @@ def train_mnist_tune(config, data_dir=None, num_epochs=10, num_gpus=0):
         callbacks=[TuneReportCheckpointCallback(metrics, on="validation_end")],
         # callbacks=[checkpoint_callback],
     )
-    # trainer.ml_out = mlf_out
     trainer.fit(model, dm)
 
 

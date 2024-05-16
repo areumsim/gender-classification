@@ -1,6 +1,6 @@
-# ref. https://docs.ray.io/en/latest/train/getting-started-pytorch-lightning.html
-# MLFlow : https://docs.ray.io/en/latest/tune/examples/includes/mlflow_ptl_example.html
-#           https://docs.ray.io/en/latest/tune/examples/tune-mlflow.html
+### ref. https://docs.ray.io/en/latest/train/getting-started-pytorch-lightning.html
+### MLFlow ref.  https://docs.ray.io/en/latest/tune/examples/includes/mlflow_ptl_example.html
+###              https://docs.ray.io/en/latest/tune/examples/tune-mlflow.html
 
 import os
 import yaml
@@ -66,9 +66,8 @@ def train_model(config):
     """
     Function to initialize data loaders, model, and trainer to be used with Ray.
     """
-    config_ = config["cfg"]
     train_loader, valid_loader = create_dataloaders(config)
-    setup_mlflow(config)  # test . config / config_
+    setup_mlflow(config)
 
     callbacks = [
         TuneReportCheckpointCallback(
@@ -86,14 +85,15 @@ def train_model(config):
     model = ImageClassifier(config)
 
     # Configure PyTorch Lightning Trainer.
+    cfg_train = config["cfg"]["train"]
     trainer = pl.Trainer(
-        max_epochs=config_["train"]["num_epochs"],
+        max_epochs=cfg_train["num_epochs"],
         devices="auto",
         accelerator="auto",
-        log_every_n_steps=config_["train"]["log_every_n_steps"],
-        limit_val_batches=config_["train"]["limit_val_batches"],
+        log_every_n_steps=cfg_train["log_every_n_steps"],
+        limit_val_batches=cfg_train["limit_val_batches"],
         # val_check_interval=0.1,
-        check_val_every_n_epoch=config_["train"]["check_val_every_n_epoch"],
+        check_val_every_n_epoch=cfg_train["check_val_every_n_epoch"],
         callbacks=callbacks,
     )
 

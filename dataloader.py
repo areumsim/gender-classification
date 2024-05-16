@@ -1,3 +1,5 @@
+### ref. https://github.com/Robocup-Lyontech/liris_person_attributes/blob/master/loader_peta_dataset.py
+
 import os
 import random
 from glob import glob
@@ -13,10 +15,8 @@ import matplotlib.pyplot as plt
 import torch
 from einops import rearrange
 
-### ref. https://github.com/Robocup-Lyontech/liris_person_attributes/blob/master/loader_peta_dataset.py
 
-
-def show_originalimage(image):
+def show_original_image(image):
     image = torch.clamp(image, -1, 1)
     img = image.cpu().numpy().copy()
     img *= np.array([0.229, 0.224, 0.225])[:, None, None]
@@ -28,7 +28,7 @@ def show_originalimage(image):
     return img
 
 
-def make_transforms(height, width):
+def create_transforms(height, width):
     """
     Create a torchvision transforms pipeline for image preprocessing.
 
@@ -114,7 +114,7 @@ class PETADataset(Dataset):
     def __init__(self, train, cfg, split_ratio=0.8, seed=42, augmentation=False):
         self.is_train = train
         self.data_dir = cfg["PETA"]["data_dir"]
-        self.transform = make_transforms(cfg["PETA"]["height"], cfg["PETA"]["width"])
+        self.transform = create_transforms(cfg["PETA"]["height"], cfg["PETA"]["width"])
 
         self.image_files, self.labels = self.load_dataset()
 
@@ -180,7 +180,7 @@ class PETADataset(Dataset):
         train_indices = indices[:split_idx]  #### test  [:1500]
         valid_indices = indices[split_idx:]  #### test  [:100]
 
-        ### (train/valid/test로 ) split ratio를 (0.7, 0.2)와 같이 입력 ###
+        ### TODO: (train/valid/test로) split_ratio를 (0.7, 0.2)로 입력 ###
         # train_end = int(len(indices) * split_ratios[0])
         # valid_end = train_end + int(len(indices) * split_ratios[1])
 
@@ -225,9 +225,9 @@ class PETADataset(Dataset):
             image = self.augmentation_seq(image=np.array(original_image))
             image = Image.fromarray(image)
 
-        # # Show concat image  the original image and the augment image
-        # original_img = show_originalimage(self.transform(original_image))
-        # augment_img = show_originalimage(self.transform(image))
+        ### Show concat image  the original image and the augment image
+        # original_img = show_original_image(self.transform(original_image))
+        # augment_img = show_original_image(self.transform(image))
         # plt.figure(figsize=(10, 5))
         # plt.subplot(1, 2, 1)
         # plt.imshow(original_img)
@@ -255,7 +255,7 @@ if __name__ == "__main__":
     print(f"Label: {label}, Image shape: {image.shape}")
 
     # Show the original image
-    original_img = show_originalimage(image)
+    original_img = show_original_image(image)
     label = ["male" if label == 1 else "female"]
     plt.imshow(original_img)
     plt.title(f"{label[0]}")

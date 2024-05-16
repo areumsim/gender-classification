@@ -1,7 +1,8 @@
+### Using a pretrained backbone ref. https://huggingface.co/docs/timm/v0.9.16/en/reference/models#timm.create_model
+
 import torch.nn as nn
 from torch.optim import SGD, Adam
 from torchmetrics import Accuracy
-
 import timm
 import lightning.pytorch as pl
 
@@ -18,7 +19,7 @@ class ImageClassifier(pl.LightningModule):
             config["model_name"], pretrained=True, num_classes=1
         )
 
-        self.lf = config["lr"]
+        self.lr = config["lr"]
         self.optimizer_type = config["optimizer"]
 
         if config["optimizer"] == "adam":
@@ -53,4 +54,4 @@ class ImageClassifier(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return self.optimizer(self.model.parameters(), lr=self.lf)
+        return self.optimizer(self.model.parameters(), lr=self.lr)

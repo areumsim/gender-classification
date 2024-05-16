@@ -1,6 +1,6 @@
-# ref. https://huggingface.co/docs/hub/timm
-# $ import timm
-# $ timm.list_models()
+### ref. https://huggingface.co/docs/hub/timm
+### $ import timm
+### $ timm.list_models()
 
 'adv_inception_v3'
 'bat_resnext26ts'

@@ -10,14 +10,10 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 
 import lightning as L
 
-from torch.optim import Adam
-from torchmetrics import Accuracy
 from torchvision import models
 
 from einops import rearrange
 from dataloader import PETADataset
-
-import timm
 
 from ImageClassifier import ImageClassifier
 
@@ -32,45 +28,6 @@ def show_originalimage(image):
     img = img * 255
     img = img.astype(np.uint8)
     return img
-
-
-# class ImageClassifier(L.LightningModule):
-#     def __init__(self, config):
-#         super(ImageClassifier, self).__init__()
-#         self.lf = 1e-4
-
-#         self.criterion = torch.nn.BCEWithLogitsLoss()
-
-#         self.optimizer = Adam
-#         self.acc = Accuracy(task="binary", num_classes=1)
-
-#         # Using a pretrained backbone
-#         ## ref. https://huggingface.co/docs/timm/v0.9.16/en/reference/models#timm.create_model
-#         self.model = timm.create_model(
-#             config["model_name"], pretrained=True, num_classes=1
-#         )
-
-#     def forward(self, x):
-#         x = self.model(x)
-#         return x.squeeze(-1)  # Change the output dimension from [48, 1] to [48]
-
-#     def training_step(self, batch, batch_idx):
-#         x, y = batch
-#         outputs = self.forward(x)
-#         loss = self.criterion(outputs, y.float())
-#         self.log("loss", loss, on_step=True, prog_bar=True)
-#         return loss
-
-#     def validation_step(self, batch, batch_idx):
-#         x, y = batch
-#         self.val_origin_image = x
-#         self.val_output = self.forward(x)
-#         loss = self.criterion(self.val_output, y.float())
-#         self.log("val_loss", loss, on_step=True, prog_bar=True)
-#         return loss
-
-#     def configure_optimizers(self):
-#         return self.optimizer(self.model.parameters(), lr=self.lf)
 
 
 if __name__ == "__main__":
@@ -141,7 +98,7 @@ if __name__ == "__main__":
         precision="16-mixed",
         log_every_n_steps=16,
         limit_val_batches=50,
-        # logger=wandb_logger,
+        logger=wandb_logger,
         # val_check_interval=1/5,
         check_val_every_n_epoch=1,
     )

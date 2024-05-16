@@ -1,39 +1,27 @@
+### ref.  https://docs.ray.io/en/latest/tune/examples/tune-mlflow.html
+
 import os
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
-
 import lightning.pytorch as pl
 
 # import lightning as L
-import mlflow.pytorch
 
-# Required libraries
 import ray
-import ray.air as air
 import ray.train.lightning
 import torch
-import torch.nn as nn
-import torch.optim as optim
 
-#  https://docs.ray.io/en/latest/tune/examples/tune-mlflow.html
 import yaml
 from ray import tune
 
-# from ray.tune.integration.mlflow import MLflowLoggerCallback
-from ray.air.integrations.mlflow import MLflowLoggerCallback, setup_mlflow
 from ray.train import ScalingConfig
 from ray.train.torch import TorchConfig, TorchTrainer
-from ray import train, tune
-from ray.tune import CLIReporter
+from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 from torch.utils.data import DataLoader
-from torchvision import datasets, models, transforms
-from torchvision.datasets import FashionMNIST
-from torchvision.models import resnet18
-from torchvision.transforms import Compose, Normalize, ToTensor
 
 from dataloader import PETADataset
 from torch.optim import SGD, Adam
@@ -149,10 +137,7 @@ if __name__ == "__main__":
 
     scheduler = ASHAScheduler(max_t=20, grace_period=1, reduction_factor=2)
 
-    storage_path = (
-        # "C:\\Users\\wolve\\arsim\\gender-classification-1\\ray_tmp\\ray_results"
-        "E:/sim/gender-classification/ray_tmp/ray_results"
-    )
+    storage_path = "E:/sim/gender-classification/ray_tmp/ray_results"
     os.makedirs(storage_path, exist_ok=True)
     exp_name = "tune_analyzing_results"
 
