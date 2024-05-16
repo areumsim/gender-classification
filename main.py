@@ -153,8 +153,8 @@ def main():
         "optimizer": tune.choice(cfg_hyperparameters["optimizer"]),
         "augment_data": (
             tune.grid_search([True, False])
-            if cfg_hyperparameters["augment_data"]
-            else False
+            if cfg_hyperparameters["augment_data"] == "Both"
+            else cfg_hyperparameters["augment_data"]
         ),
     }
 
